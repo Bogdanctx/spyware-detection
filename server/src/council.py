@@ -23,7 +23,7 @@ class Council:
             'random_forest': 97.91,
             'svm': 95.39,
             'xgboost': 98.78,
-            'cnn': 94.09
+            'cnn': 95.17
         }
 
         total = sum(self.weights.values())

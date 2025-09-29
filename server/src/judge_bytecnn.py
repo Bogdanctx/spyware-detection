@@ -24,8 +24,8 @@ class JudgeByteCNN(torch.nn.Module, Judge):
     CONFIG = {
         "VIEW_LEN": 30000, # Number of bytes to consider from each file
         "DEVICE": "cuda" if torch.cuda.is_available() else "cpu",
-        "EPOCHS": 200,
-        "BATCH_SIZE": 512
+        "EPOCHS": 500,
+        "BATCH_SIZE": 600
     }
 
     def __init__(self):
@@ -35,31 +35,39 @@ class JudgeByteCNN(torch.nn.Module, Judge):
         self.embedding = torch.nn.Embedding(256, 16) # Embedding layer for byte values (0-255)
         self.conv_layers = torch.nn.Sequential(
             # First block
-            torch.nn.Conv1d(16, 32, kernel_size=7, stride=2, padding=3),
+            torch.nn.Conv1d(16, 32, kernel_size = 9, stride = 2, padding = 3),
             torch.nn.BatchNorm1d(32),
             torch.nn.ReLU(),
+            torch.nn.Dropout1d(0.35),
             torch.nn.MaxPool1d(2),
-            torch.nn.Dropout1d(0.3),
             
             # Second block
-            torch.nn.Conv1d(32, 64, kernel_size=5, stride=1, padding=2),
+            torch.nn.Conv1d(32, 64, kernel_size = 5, stride = 2, padding=2),
             torch.nn.BatchNorm1d(64),
             torch.nn.ReLU(),
+            torch.nn.Dropout1d(0.4),
             torch.nn.MaxPool1d(2),
-            torch.nn.Dropout1d(0.3),
-            torch.nn.AdaptiveAvgPool1d(32),  # Fixed size output
+
+            torch.nn.Conv1d(64, 128, kernel_size = 3, stride = 1, padding = 1),
+            torch.nn.BatchNorm1d(128),
+            torch.nn.ReLU(),
+            torch.nn.Dropout1d(0.45),
+            torch.nn.MaxPool1d(2),
+            
+            torch.nn.AdaptiveAvgPool1d(128),  # Fixed size output
         )
+        
         self.fc_layers = torch.nn.Sequential(
             torch.nn.Flatten(),
-            torch.nn.Linear(64 * 32, 128),
-            torch.nn.BatchNorm1d(128),
+            torch.nn.Linear(128 * 128, 256),
+            torch.nn.BatchNorm1d(256),
             torch.nn.ReLU(),
             torch.nn.Dropout(0.5),
 
-            torch.nn.Linear(128, 2)
+            torch.nn.Linear(256, 2)
         )
 
-        self.loss_function = torch.nn.CrossEntropyLoss(label_smoothing = 0.1, weight=torch.tensor([0.7, 1.3]))
+        self.loss_function = torch.nn.CrossEntropyLoss(label_smoothing = 0.15, weight=torch.tensor([0.7, 1.3]))
         self.train_loss = []
         self.validation_loss = []
         self.train_accuracy = []
@@ -97,13 +105,13 @@ class JudgeByteCNN(torch.nn.Module, Judge):
         import time
 
         self.to(self.CONFIG["DEVICE"])
-        optimizer = torch.optim.AdamW(params=self.parameters(), 
-                                      lr=0.001,
-                                      weight_decay=1e-4)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer,
-                                                               mode='min',
-                                                               factor=0.5,
-                                                               patience=8)
+        optimizer = torch.optim.AdamW(params = self.parameters(), 
+                                      lr = 0.001,
+                                      weight_decay = 0.001)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer = optimizer,
+                                                               mode = 'min',
+                                                               factor = 0.5,
+                                                               patience = 8)
         
         best_val_loss = float('inf')
         early_stopping_counter = 0
@@ -160,7 +168,7 @@ class JudgeByteCNN(torch.nn.Module, Judge):
                 early_stopping_counter = 0
             else:
                 early_stopping_counter += 1
-                if early_stopping_counter >= 12:
+                if early_stopping_counter >= 10:
                     print("Early stopping triggered.")
                     break
 
